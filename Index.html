@@ -1,0 +1,128 @@
+<!-- Archivo Index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Gestor de Tareas y Proyectos</h1>
+      <div class="user-info">
+        <span id="currentUser"></span>
+      </div>
+    </header>
+    
+    <div class="controls">
+      <button id="btnNuevaTarea" class="btn btn-primary">Nueva Tarea</button>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Buscar tareas...">
+      </div>
+    </div>
+    
+    <div class="tasks-container">
+      <table id="tasksTable">
+        <thead>
+          <tr>
+            <th>Fecha de Entrega</th>
+            <th>Tiempo Pendiente</th>
+            <th>Estatus</th>
+            <th>Prioridad</th>
+            <th>Responsable</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th>Creado</th>
+            <th>Creador</th>
+          </tr>
+        </thead>
+        <tbody id="tasksTableBody">
+          <!-- Aquí se cargarán dinámicamente las tareas -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Modal para nueva tarea -->
+  <div id="taskModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Nueva Tarea</h2>
+      <form id="taskForm">
+        <div class="form-group">
+          <label for="fechaEntrega">Fecha de Entrega:</label>
+          <input type="date" id="fechaEntrega" name="fechaEntrega">
+        </div>
+        
+        <div class="form-group">
+          <label for="responsable">Responsable:</label>
+          <select id="responsable" name="responsable" required>
+            <option value="">Seleccione un responsable</option>
+            <!-- Se cargarán dinámicamente -->
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="estatus">Estatus:</label>
+          <select id="estatus" name="estatus" required>
+            <option value="">Seleccione un estatus</option>
+            <!-- Se cargarán dinámicamente -->
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="tipo">Tipo:</label>
+          <select id="tipo" name="tipo" required>
+            <option value="">Seleccione un tipo</option>
+            <!-- Se cargarán dinámicamente -->
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="prioridad">Prioridad:</label>
+          <select id="prioridad" name="prioridad" required>
+            <option value="">Seleccione una prioridad</option>
+            <!-- Se cargarán dinámicamente -->
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="descripcion">Descripción:</label>
+          <div class="description-toolbar">
+            <button type="button" id="btnAddLink" class="btn btn-small">Agregar Enlace</button>
+          </div>
+          <textarea id="descripcion" name="descripcion" rows="4"></textarea>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn btn-success">Guardar Tarea</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelar">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Modal para agregar enlaces -->
+  <div id="linkModal" class="modal">
+    <div class="modal-content modal-sm">
+      <span class="close link-close">&times;</span>
+      <h3>Agregar Enlace</h3>
+      <div class="form-group">
+        <label for="linkUrl">URL:</label>
+        <input type="url" id="linkUrl" name="linkUrl" placeholder="https://..." required>
+      </div>
+      <div class="form-group">
+        <label for="linkText">Texto mostrado:</label>
+        <input type="text" id="linkText" name="linkText" placeholder="Nombre del enlace" required>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="btnInsertLink" class="btn btn-success">Insertar Enlace</button>
+      </div>
+    </div>
+  </div>
+  
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
