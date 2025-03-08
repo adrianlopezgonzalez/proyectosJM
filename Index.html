@@ -18,6 +18,20 @@
     
     <div class="controls">
       <button id="btnNuevaTarea" class="btn btn-primary">Nueva Tarea</button>
+      <div class="filters">
+        <select id="filterEstatus" class="filter-select">
+          <option value="">Todos los estatus</option>
+          <!-- Se cargará dinámicamente -->
+        </select>
+        <select id="filterResponsable" class="filter-select">
+          <option value="">Todos los responsables</option>
+          <!-- Se cargará dinámicamente -->
+        </select>
+        <select id="filterTipo" class="filter-select">
+          <option value="">Todos los tipos</option>
+          <!-- Se cargará dinámicamente -->
+        </select>
+      </div>
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="Buscar tareas...">
       </div>
@@ -27,15 +41,13 @@
       <table id="tasksTable">
         <thead>
           <tr>
-            <th>Fecha de Entrega</th>
+            <th class="sortable" data-sort="fechaEntrega">Fecha de Entrega <span class="sort-icon">&#8597;</span></th>
             <th>Tiempo Pendiente</th>
             <th>Estatus</th>
-            <th>Prioridad</th>
             <th>Responsable</th>
             <th>Tipo</th>
             <th>Descripción</th>
-            <th>Creado</th>
-            <th>Creador</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="tasksTableBody">
@@ -45,12 +57,14 @@
     </div>
   </div>
   
-  <!-- Modal para nueva tarea -->
+  <!-- Modal para nueva/editar tarea -->
   <div id="taskModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2>Nueva Tarea</h2>
+      <h2 id="modalTitle">Nueva Tarea</h2>
       <form id="taskForm">
+        <input type="hidden" id="taskRowNumber" name="taskRowNumber">
+        
         <div class="form-group">
           <label for="fechaEntrega">Fecha de Entrega:</label>
           <input type="date" id="fechaEntrega" name="fechaEntrega">
@@ -76,14 +90,6 @@
           <label for="tipo">Tipo:</label>
           <select id="tipo" name="tipo" required>
             <option value="">Seleccione un tipo</option>
-            <!-- Se cargarán dinámicamente -->
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label for="prioridad">Prioridad:</label>
-          <select id="prioridad" name="prioridad" required>
-            <option value="">Seleccione una prioridad</option>
             <!-- Se cargarán dinámicamente -->
           </select>
         </div>
