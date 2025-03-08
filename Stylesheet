@@ -1,303 +1,306 @@
-<!-- Archivo JavaScript.html -->
-<script>
-  // Variables globales
-  let configData = {};
-  let tasksData = [];
+<!-- Archivo Stylesheet.html -->
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
   
-  // Cargar datos iniciales al cargar la página
-  document.addEventListener('DOMContentLoaded', function() {
-    // Cargar usuario actual
-    google.script.run
-      .withSuccessHandler(function(user) {
-        document.getElementById('currentUser').textContent = `Usuario: ${user}`;
-      })
-      .getCurrentUser();
-    
-    // Cargar datos de configuración
-    google.script.run
-      .withSuccessHandler(function(data) {
-        configData = data;
-        populateDropdowns();
-      })
-      .getConfigData();
-    
-    // Cargar tareas
-    loadTasks();
-    
-    // Event listeners para los botones
-    document.getElementById('btnNuevaTarea').addEventListener('click', openTaskModal);
-    document.getElementById('btnCancelar').addEventListener('click', closeTaskModal);
-    document.getElementById('taskForm').addEventListener('submit', handleTaskSubmit);
-    document.getElementById('btnAddLink').addEventListener('click', openLinkModal);
-    document.getElementById('btnInsertLink').addEventListener('click', insertLink);
-    document.getElementById('searchInput').addEventListener('keyup', filterTasks);
-    
-    // Cerrar modales con el botón X
-    const closeButtons = document.getElementsByClassName('close');
-    for (let i = 0; i < closeButtons.length; i++) {
-      closeButtons[i].addEventListener('click', function() {
-        if (this.classList.contains('link-close')) {
-          closeLinkModal();
-        } else {
-          closeTaskModal();
-        }
-      });
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f8f9fa;
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  h1 {
+    color: #2c3e50;
+  }
+  
+  .user-info {
+    font-style: italic;
+    color: #666;
+  }
+  
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .filters {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .filter-select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+  }
+  
+  .search-box input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 250px;
+  }
+  
+  .tasks-container {
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow-x: auto;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  
+  .sortable {
+    cursor: pointer;
+  }
+  
+  .sort-icon {
+    margin-left: 5px;
+  }
+  
+  tr:hover {
+    filter: brightness(95%);
+  }
+  
+  /* Colores de fondo para las filas según el estatus */
+  .status-no-iniciado {
+    background-color: #FF5733;
+  }
+  
+  .status-en-proceso {
+    background-color: #FFC300;
+  }
+  
+  .status-en-revision {
+    background-color: #DAF7A6;
+  }
+  
+  .status-finalizado {
+    background-color: #90E9FF;
+  }
+  
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+  }
+  
+  .btn-primary {
+    background-color: #3498db;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background-color: #2980b9;
+  }
+  
+  .btn-success {
+    background-color: #2ecc71;
+    color: white;
+  }
+  
+  .btn-success:hover {
+    background-color: #27ae60;
+  }
+  
+  .btn-secondary {
+    background-color: #95a5a6;
+    color: white;
+  }
+  
+  .btn-secondary:hover {
+    background-color: #7f8c8d;
+  }
+  
+  .btn-edit {
+    background-color: #f39c12;
+    color: white;
+    padding: 5px 10px;
+    font-size: 0.9em;
+  }
+  
+  .btn-edit:hover {
+    background-color: #d35400;
+  }
+  
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 0.8em;
+  }
+  
+  /* Modal styles */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+  }
+  
+  .modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 60%;
+    max-width: 600px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  
+  .modal-sm {
+    width: 40%;
+    max-width: 400px;
+  }
+  
+  .close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .close:hover,
+  .close:focus {
+    color: black;
+    text-decoration: none;
+  }
+  
+  h2, h3 {
+    margin-bottom: 15px;
+    color: #2c3e50;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  
+  .form-actions {
+    margin-top: 20px;
+    text-align: right;
+  }
+  
+  .form-actions button {
+    margin-left: 10px;
+  }
+  
+  .description-toolbar {
+    margin-bottom: 5px;
+  }
+  
+  /* Estatus select en la tabla */
+  .estatus-select {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  /* Link in description */
+  .task-link {
+    color: #3498db;
+    text-decoration: underline;
+  }
+  
+  /* Task metadata */
+  .task-metadata {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .metadata-item {
+    margin-right: 15px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .metadata-icon {
+    margin-right: 5px;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .controls {
+      flex-direction: column;
+      gap: 10px;
     }
-  });
-  
-  // Cargar todas las tareas
-  function loadTasks() {
-    google.script.run
-      .withSuccessHandler(function(tasks) {
-        tasksData = tasks;
-        renderTasks(tasks);
-      })
-      .getAllTasks();
-  }
-  
-  // Renderizar las tareas en la tabla
-  function renderTasks(tasks) {
-    const tbody = document.getElementById('tasksTableBody');
-    tbody.innerHTML = '';
     
-    tasks.forEach(function(task, index) {
-      const row = document.createElement('tr');
-      
-      // Calcular tiempo pendiente
-      let tiempoPendiente = '';
-      if (task.fechaCreacion) {
-        tiempoPendiente = calculatePendingTime(task.fechaCreacion, task.fechaEntrega);
-      }
-      
-      // Formatear descripción para mostrar enlaces HTML
-      const descripcion = task.descripcion ? task.descripcion.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="task-link" target="_blank">$1</a>') : '';
-      
-      // Aplicar clase de prioridad
-      let prioridadClass = '';
-      if (task.prioridad && task.prioridad.toLowerCase().includes('alta')) {
-        prioridadClass = 'priority-alta';
-      } else if (task.prioridad && task.prioridad.toLowerCase().includes('media')) {
-        prioridadClass = 'priority-media';
-      } else if (task.prioridad && task.prioridad.toLowerCase().includes('baja')) {
-        prioridadClass = 'priority-baja';
-      }
-      
-      // Extraer solo el identificador del correo del creador
-      const creador = task.creador ? task.creador.split('@')[0] : '';
-      
-      // Crear selector de estatus
-      const estatusSelect = document.createElement('select');
-      estatusSelect.className = 'estatus-select';
-      estatusSelect.dataset.rowNumber = task.rowNumber;
-      
-      // Agregar opciones al selector de estatus
-      configData.estatus.forEach(function(status) {
-        const option = document.createElement('option');
-        option.value = status;
-        option.textContent = status;
-        if (status === task.estatus) {
-          option.selected = true;
-        }
-        estatusSelect.appendChild(option);
-      });
-      
-      // Agregar evento de cambio al selector de estatus
-      estatusSelect.addEventListener('change', function() {
-        updateTaskStatus(this.dataset.rowNumber, this.value);
-      });
-      
-      // Agregar las celdas a la fila en el nuevo orden
-      const cells = [
-        `<td>${task.fechaEntrega || ''}</td>`,
-        `<td>${tiempoPendiente}</td>`,
-        `<td>${estatusSelect.outerHTML}</td>`,
-        `<td class="${prioridadClass}">${task.prioridad || ''}</td>`,
-        `<td>${task.responsable || ''}</td>`,
-        `<td>${task.tipo || ''}</td>`,
-        `<td>${descripcion}</td>`,
-        `<td>${task.fechaCreacion || ''}</td>`,
-        `<td>${creador}</td>`
-      ];
-      
-      row.innerHTML = cells.join('');
-      tbody.appendChild(row);
-    });
-  }
-  
-  // Poblar los campos desplegables con datos de configuración
-  function populateDropdowns() {
-    // Responsables
-    const responsableSelect = document.getElementById('responsable');
-    responsableSelect.innerHTML = '<option value="">Seleccione un responsable</option>';
-    configData.usuarios.forEach(function(user) {
-      const option = document.createElement('option');
-      option.value = user.nombre;
-      option.textContent = user.nombre;
-      responsableSelect.appendChild(option);
-    });
-    
-    // Estatus
-    const estatusSelect = document.getElementById('estatus');
-    estatusSelect.innerHTML = '<option value="">Seleccione un estatus</option>';
-    configData.estatus.forEach(function(estatus) {
-      const option = document.createElement('option');
-      option.value = estatus;
-      option.textContent = estatus;
-      estatusSelect.appendChild(option);
-    });
-    
-    // Tipos
-    const tipoSelect = document.getElementById('tipo');
-    tipoSelect.innerHTML = '<option value="">Seleccione un tipo</option>';
-    configData.tipos.forEach(function(tipo) {
-      const option = document.createElement('option');
-      option.value = tipo;
-      option.textContent = tipo;
-      tipoSelect.appendChild(option);
-    });
-    
-    // Prioridades
-    const prioridadSelect = document.getElementById('prioridad');
-    prioridadSelect.innerHTML = '<option value="">Seleccione una prioridad</option>';
-    configData.prioridades.forEach(function(prioridad) {
-      const option = document.createElement('option');
-      option.value = prioridad;
-      option.textContent = prioridad;
-      prioridadSelect.appendChild(option);
-    });
-  }
-  
-  // Abrir modal de nueva tarea
-  function openTaskModal() {
-    document.getElementById('taskForm').reset();
-    document.getElementById('taskModal').style.display = 'block';
-  }
-  
-  // Cerrar modal de nueva tarea
-  function closeTaskModal() {
-    document.getElementById('taskModal').style.display = 'none';
-  }
-  
-  // Abrir modal para agregar enlaces
-  function openLinkModal() {
-    document.getElementById('linkUrl').value = '';
-    document.getElementById('linkText').value = '';
-    document.getElementById('linkModal').style.display = 'block';
-  }
-  
-  // Cerrar modal para agregar enlaces
-  function closeLinkModal() {
-    document.getElementById('linkModal').style.display = 'none';
-  }
-  
-  // Insertar enlace en el campo de descripción
-  function insertLink() {
-    const url = document.getElementById('linkUrl').value.trim();
-    const text = document.getElementById('linkText').value.trim();
-    
-    if (url && text) {
-      const descripcionTextarea = document.getElementById('descripcion');
-      const linkMarkdown = `[${text}](${url})`;
-      
-      // Insertar el enlace en la posición del cursor
-      const cursorPos = descripcionTextarea.selectionStart;
-      const textBefore = descripcionTextarea.value.substring(0, cursorPos);
-      const textAfter = descripcionTextarea.value.substring(cursorPos);
-      
-      descripcionTextarea.value = textBefore + linkMarkdown + textAfter;
-      
-      // Cerrar el modal
-      closeLinkModal();
-    } else {
-      alert('Por favor, ingrese tanto la URL como el texto del enlace.');
-    }
-  }
-  
-  // Manejar el envío del formulario de nueva tarea
-  function handleTaskSubmit(event) {
-    event.preventDefault();
-    
-    // Recopilar los datos del formulario
-    const taskData = {
-      fechaEntrega: document.getElementById('fechaEntrega').value,
-      responsable: document.getElementById('responsable').value,
-      estatus: document.getElementById('estatus').value,
-      tipo: document.getElementById('tipo').value,
-      prioridad: document.getElementById('prioridad').value,
-      descripcion: document.getElementById('descripcion').value
-    };
-    
-    // Guardar la tarea
-    google.script.run
-      .withSuccessHandler(function(result) {
-        if (result) {
-          // Cerrar el modal y recargar tareas
-          closeTaskModal();
-          loadTasks();
-        } else {
-          alert('Error al guardar la tarea. Por favor, inténtelo de nuevo.');
-        }
-      })
-      .saveTask(taskData);
-  }
-  
-  // Actualizar el estado de una tarea
-  function updateTaskStatus(rowNumber, newStatus) {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        if (result) {
-          // Recargar las tareas para reflejar el cambio
-          loadTasks();
-        } else {
-          alert('Error al actualizar el estado de la tarea. Por favor, inténtelo de nuevo.');
-        }
-      })
-      .updateTaskStatus(rowNumber, newStatus);
-  }
-  
-  // Filtrar tareas por texto de búsqueda
-  function filterTasks() {
-    const searchText = document.getElementById('searchInput').value.toLowerCase();
-    
-    if (!searchText) {
-      // Si no hay texto de búsqueda, mostrar todas las tareas
-      renderTasks(tasksData);
-      return;
+    .filters {
+      flex-wrap: wrap;
     }
     
-    // Filtrar tareas que coincidan con el texto de búsqueda
-    const filteredTasks = tasksData.filter(function(task) {
-      return (
-        (task.responsable && task.responsable.toLowerCase().includes(searchText)) ||
-        (task.estatus && task.estatus.toLowerCase().includes(searchText)) ||
-        (task.tipo && task.tipo.toLowerCase().includes(searchText)) ||
-        (task.prioridad && task.prioridad.toLowerCase().includes(searchText)) ||
-        (task.descripcion && task.descripcion.toLowerCase().includes(searchText)) ||
-        (task.creador && task.creador.toLowerCase().includes(searchText))
-      );
-    });
+    .search-box {
+      width: 100%;
+    }
     
-    renderTasks(filteredTasks);
-  }
-  
-  // Calcular tiempo pendiente
-  function calculatePendingTime(creationDate, deliveryDate) {
-    const now = new Date();
-    const creation = new Date(creationDate);
-    const delivery = deliveryDate ? new Date(deliveryDate) : null;
+    .search-box input {
+      width: 100%;
+    }
     
-    // Si hay fecha de entrega, calculamos con respecto a ella
-    const targetDate = delivery || now;
-    const diffMs = targetDate - now;
-    const diffHours = diffMs / (1000 * 60 * 60);
-    
-    if (diffMs < 0) {
-      return "Vencido";
-    } else if (diffHours >= 24) {
-      const diffDays = Math.floor(diffHours / 24);
-      return `Faltan ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
-    } else {
-      return `Faltan ${Math.floor(diffHours)} hora${Math.floor(diffHours) !== 1 ? 's' : ''}`;
+    .modal-content {
+      width: 90%;
     }
   }
-</script>
+</style>
