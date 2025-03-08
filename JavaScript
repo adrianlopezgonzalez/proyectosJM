@@ -1,228 +1,437 @@
-<!-- Archivo Stylesheet.html -->
-<style>
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+<!-- Archivo JavaScript.html -->
+<script>
+  // Variables globales
+  let configData = {};
+  let tasksData = [];
+  let currentSortField = 'fechaEntrega';
+  let currentSortDirection = 'asc';
+  
+  // Cargar datos iniciales al cargar la página
+  document.addEventListener('DOMContentLoaded', function() {
+    // Cargar usuario actual
+    google.script.run
+      .withSuccessHandler(function(user) {
+        document.getElementById('currentUser').textContent = `Usuario: ${user}`;
+      })
+      .getCurrentUser();
+    
+    // Cargar datos de configuración
+    google.script.run
+      .withSuccessHandler(function(data) {
+        configData = data;
+        populateDropdowns();
+        setupFilters();
+      })
+      .getConfigData();
+    
+    // Cargar tareas
+    loadTasks();
+    
+    // Event listeners para los botones
+    document.getElementById('btnNuevaTarea').addEventListener('click', openNewTaskModal);
+    document.getElementById('btnCancelar').addEventListener('click', closeTaskModal);
+    document.getElementById('taskForm').addEventListener('submit', handleTaskSubmit);
+    document.getElementById('btnAddLink').addEventListener('click', openLinkModal);
+    document.getElementById('btnInsertLink').addEventListener('click', insertLink);
+    document.getElementById('searchInput').addEventListener('keyup', applyFilters);
+    
+    // Event listeners para ordenamiento
+    document.querySelectorAll('.sortable').forEach(header => {
+      header.addEventListener('click', function() {
+        const field = this.dataset.sort;
+        if (currentSortField === field) {
+          currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSortField = field;
+          currentSortDirection = 'asc';
+        }
+        
+        // Actualizar íconos de ordenamiento
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+          icon.innerHTML = '&#8597;'; // Neutral icon
+        });
+        
+        // Cambiar ícono según dirección
+        const icon = this.querySelector('.sort-icon');
+        icon.innerHTML = currentSortDirection === 'asc' ? '&#8593;' : '&#8595;';
+        
+        // Aplicar ordenamiento
+        sortAndRenderTasks();
+      });
+    });
+    
+    // Cerrar modales con el botón X
+    const closeButtons = document.getElementsByClassName('close');
+    for (let i = 0; i < closeButtons.length; i++) {
+      closeButtons[i].addEventListener('click', function() {
+        if (this.classList.contains('link-close')) {
+          closeLinkModal();
+        } else {
+          closeTaskModal();
+        }
+      });
+    }
+    
+    // Event listeners para filtros
+    document.getElementById('filterEstatus').addEventListener('change', applyFilters);
+    document.getElementById('filterResponsable').addEventListener('change', applyFilters);
+    document.getElementById('filterTipo').addEventListener('change', applyFilters);
+  });
+  
+  // Configurar filtros con opciones
+  function setupFilters() {
+    // Estatus
+    const estatusFilter = document.getElementById('filterEstatus');
+    configData.estatus.forEach(function(estatus) {
+      const option = document.createElement('option');
+      option.value = estatus;
+      option.textContent = estatus;
+      estatusFilter.appendChild(option);
+    });
+    
+    // Responsables
+    const responsableFilter = document.getElementById('filterResponsable');
+    configData.usuarios.forEach(function(user) {
+      const option = document.createElement('option');
+      option.value = user.nombre;
+      option.textContent = user.nombre;
+      responsableFilter.appendChild(option);
+    });
+    
+    // Tipos
+    const tipoFilter = document.getElementById('filterTipo');
+    configData.tipos.forEach(function(tipo) {
+      const option = document.createElement('option');
+      option.value = tipo;
+      option.textContent = tipo;
+      tipoFilter.appendChild(option);
+    });
   }
   
-  body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-    color: #333;
-    background-color: #f8f9fa;
+  // Cargar todas las tareas
+  function loadTasks() {
+    google.script.run
+      .withSuccessHandler(function(tasks) {
+        tasksData = tasks;
+        sortAndRenderTasks();
+      })
+      .getAllTasks();
   }
   
-  .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+  // Ordenar y renderizar tareas
+  function sortAndRenderTasks() {
+    // Clonar array para no modificar el original
+    const sortedTasks = [...tasksData];
+    
+    // Ordenar por fecha de entrega
+    sortedTasks.sort((a, b) => {
+      if (currentSortField === 'fechaEntrega') {
+        // Convertir fechas para comparación
+        const dateA = a.fechaEntrega ? new Date(a.fechaEntrega) : new Date(9999, 11, 31);
+        const dateB = b.fechaEntrega ? new Date(b.fechaEntrega) : new Date(9999, 11, 31);
+        
+        if (currentSortDirection === 'asc') {
+          return dateA - dateB;
+        } else {
+          return dateB - dateA;
+        }
+      }
+      return 0;
+    });
+    
+    // Aplicar filtros
+    applyFilters(sortedTasks);
   }
   
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #ddd;
+  // Aplicar filtros a las tareas
+  function applyFilters(tasks) {
+    // Si recibimos un evento, significa que fue llamado desde un event listener
+    const sortedTasks = Array.isArray(tasks) ? tasks : [...tasksData];
+    
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const estatusFilter = document.getElementById('filterEstatus').value;
+    const responsableFilter = document.getElementById('filterResponsable').value;
+    const tipoFilter = document.getElementById('filterTipo').value;
+    
+    // Aplicar todos los filtros
+    const filteredTasks = sortedTasks.filter(task => {
+      // Filtro de búsqueda textual
+      const matchesSearch = !searchText || 
+        (task.responsable && task.responsable.toLowerCase().includes(searchText)) ||
+        (task.estatus && task.estatus.toLowerCase().includes(searchText)) ||
+        (task.tipo && task.tipo.toLowerCase().includes(searchText)) ||
+        (task.descripcion && task.descripcion.toLowerCase().includes(searchText)) ||
+        (task.creador && task.creador.toLowerCase().includes(searchText));
+      
+      // Filtros de selección
+      const matchesEstatus = !estatusFilter || task.estatus === estatusFilter;
+      const matchesResponsable = !responsableFilter || task.responsable === responsableFilter;
+      const matchesTipo = !tipoFilter || task.tipo === tipoFilter;
+      
+      return matchesSearch && matchesEstatus && matchesResponsable && matchesTipo;
+    });
+    
+    // Ordenar por fecha si aplica
+    if (currentSortField === 'fechaEntrega') {
+      filteredTasks.sort((a, b) => {
+        const dateA = a.fechaEntrega ? new Date(a.fechaEntrega) : new Date(9999, 11, 31);
+        const dateB = b.fechaEntrega ? new Date(b.fechaEntrega) : new Date(9999, 11, 31);
+        
+        if (currentSortDirection === 'asc') {
+          return dateA - dateB;
+        } else {
+          return dateB - dateA;
+        }
+      });
+    }
+    
+    renderTasks(filteredTasks);
   }
   
-  h1 {
-    color: #2c3e50;
+  // Renderizar las tareas en la tabla
+  function renderTasks(tasks) {
+    const tbody = document.getElementById('tasksTableBody');
+    tbody.innerHTML = '';
+    
+    tasks.forEach(function(task) {
+      const row = document.createElement('tr');
+      
+      // Establecer clase de color según estatus
+      if (task.estatus) {
+        const statusLower = task.estatus.toLowerCase();
+        if (statusLower.includes('no iniciado')) {
+          row.className = 'status-no-iniciado';
+        } else if (statusLower.includes('en proceso')) {
+          row.className = 'status-en-proceso';
+        } else if (statusLower.includes('en revisión')) {
+          row.className = 'status-en-revision';
+        } else if (statusLower.includes('finalizado')) {
+          row.className = 'status-finalizado';
+        }
+      }
+      
+      // Calcular tiempo pendiente
+      let tiempoPendiente = '';
+      if (task.fechaEntrega) {
+        tiempoPendiente = calculatePendingTime(task.fechaEntrega);
+      }
+      
+      // Formatear fecha de entrega: yyyy-MM-dd a dd/MM/yyyy
+      let formattedFechaEntrega = '';
+      if (task.fechaEntrega) {
+        const parts = task.fechaEntrega.split('-');
+        formattedFechaEntrega = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      
+      // Formatear descripción para mostrar enlaces HTML
+      const descripcion = task.descripcion ? task.descripcion.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="task-link" target="_blank">$1</a>') : '';
+      
+      // Extraer solo la fecha de creación (dd/mm) y usuario sin dominio
+      let metadataHTML = '';
+      if (task.fechaCreacion) {
+        const creationDate = new Date(task.fechaCreacion);
+        const day = creationDate.getDate().toString().padStart(2, '0');
+        const month = (creationDate.getMonth() + 1).toString().padStart(2, '0');
+        const formattedDate = `${day}/${month}`;
+        
+        // Extraer solo el identificador del correo del creador
+        const creador = task.creador ? task.creador.split('@')[0] : '';
+        
+        metadataHTML = `
+          <div class="task-metadata">
+            <span class="metadata-item">
+              <span class="metadata-icon">📅</span> ${formattedDate}
+            </span>
+            <span class="metadata-item">
+              <span class="metadata-icon">👤</span> ${creador}
+            </span>
+          </div>
+        `;
+      }
+      
+      // Agregar las celdas a la fila
+      const cellsHTML = `
+        <td>${formattedFechaEntrega}</td>
+        <td>${tiempoPendiente}</td>
+        <td>${task.estatus || ''}</td>
+        <td>${task.responsable || ''}</td>
+        <td>${task.tipo || ''}</td>
+        <td>
+          <div>${descripcion}</div>
+          ${metadataHTML}
+        </td>
+        <td>
+          <button class="btn btn-edit" onclick="openEditTaskModal(${task.rowNumber})">Editar</button>
+        </td>
+      `;
+      
+      row.innerHTML = cellsHTML;
+      tbody.appendChild(row);
+    });
   }
   
-  .user-info {
-    font-style: italic;
-    color: #666;
+  // Poblar los campos desplegables con datos de configuración
+  function populateDropdowns() {
+    // Responsables
+    const responsableSelect = document.getElementById('responsable');
+    responsableSelect.innerHTML = '<option value="">Seleccione un responsable</option>';
+    configData.usuarios.forEach(function(user) {
+      const option = document.createElement('option');
+      option.value = user.nombre;
+      option.textContent = user.nombre;
+      responsableSelect.appendChild(option);
+    });
+    
+    // Estatus
+    const estatusSelect = document.getElementById('estatus');
+    estatusSelect.innerHTML = '<option value="">Seleccione un estatus</option>';
+    configData.estatus.forEach(function(estatus) {
+      const option = document.createElement('option');
+      option.value = estatus;
+      option.textContent = estatus;
+      estatusSelect.appendChild(option);
+    });
+    
+    // Tipos
+    const tipoSelect = document.getElementById('tipo');
+    tipoSelect.innerHTML = '<option value="">Seleccione un tipo</option>';
+    configData.tipos.forEach(function(tipo) {
+      const option = document.createElement('option');
+      option.value = tipo;
+      option.textContent = tipo;
+      tipoSelect.appendChild(option);
+    });
   }
   
-  .controls {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
+  // Abrir modal para nueva tarea
+  function openNewTaskModal() {
+    document.getElementById('modalTitle').textContent = 'Nueva Tarea';
+    document.getElementById('taskForm').reset();
+    document.getElementById('taskRowNumber').value = '';
+    document.getElementById('taskModal').style.display = 'block';
   }
   
-  .search-box input {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    width: 250px;
+  // Abrir modal para editar tarea
+  function openEditTaskModal(rowNumber) {
+    // Buscar la tarea por número de fila
+    const task = tasksData.find(t => t.rowNumber === rowNumber);
+    if (!task) return;
+    
+    document.getElementById('modalTitle').textContent = 'Editar Tarea';
+    document.getElementById('taskRowNumber').value = rowNumber;
+    
+    // Poblar el formulario con los datos de la tarea
+    document.getElementById('fechaEntrega').value = task.fechaEntrega || '';
+    document.getElementById('responsable').value = task.responsable || '';
+    document.getElementById('estatus').value = task.estatus || '';
+    document.getElementById('tipo').value = task.tipo || '';
+    document.getElementById('descripcion').value = task.descripcion || '';
+    
+    // Mostrar el modal
+    document.getElementById('taskModal').style.display = 'block';
   }
   
-  .tasks-container {
-    background-color: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    overflow-x: auto;
+  // Cerrar modal de tarea
+  function closeTaskModal() {
+    document.getElementById('taskModal').style.display = 'none';
   }
   
-  table {
-    width: 100%;
-    border-collapse: collapse;
+  // Abrir modal para agregar enlaces
+  function openLinkModal() {
+    document.getElementById('linkUrl').value = '';
+    document.getElementById('linkText').value = '';
+    document.getElementById('linkModal').style.display = 'block';
   }
   
-  th, td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
+  // Cerrar modal para agregar enlaces
+  function closeLinkModal() {
+    document.getElementById('linkModal').style.display = 'none';
   }
   
-  th {
-    background-color: #f2f2f2;
-    font-weight: bold;
+  // Insertar enlace en el campo de descripción
+  function insertLink() {
+    const url = document.getElementById('linkUrl').value.trim();
+    const text = document.getElementById('linkText').value.trim();
+    
+    if (url && text) {
+      const descripcionTextarea = document.getElementById('descripcion');
+      const linkMarkdown = `[${text}](${url})`;
+      
+      // Insertar el enlace en la posición del cursor
+      const cursorPos = descripcionTextarea.selectionStart;
+      const textBefore = descripcionTextarea.value.substring(0, cursorPos);
+      const textAfter = descripcionTextarea.value.substring(cursorPos);
+      
+      descripcionTextarea.value = textBefore + linkMarkdown + textAfter;
+      
+      // Cerrar el modal
+      closeLinkModal();
+    } else {
+      alert('Por favor, ingrese tanto la URL como el texto del enlace.');
+    }
   }
   
-  tr:hover {
-    background-color: #f5f5f5;
+  // Manejar el envío del formulario de tarea
+  function handleTaskSubmit(event) {
+    event.preventDefault();
+    
+    // Recopilar los datos del formulario
+    const taskData = {
+      rowNumber: document.getElementById('taskRowNumber').value,
+      fechaEntrega: document.getElementById('fechaEntrega').value,
+      responsable: document.getElementById('responsable').value,
+      estatus: document.getElementById('estatus').value,
+      tipo: document.getElementById('tipo').value,
+      descripcion: document.getElementById('descripcion').value
+    };
+    
+    // Determinar si es una nueva tarea o una edición
+    if (taskData.rowNumber) {
+      // Editar tarea existente
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result) {
+            closeTaskModal();
+            loadTasks();
+          } else {
+            alert('Error al actualizar la tarea. Por favor, inténtelo de nuevo.');
+          }
+        })
+        .updateTask(taskData);
+    } else {
+      // Guardar nueva tarea
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result) {
+            closeTaskModal();
+            loadTasks();
+          } else {
+            alert('Error al guardar la tarea. Por favor, inténtelo de nuevo.');
+          }
+        })
+        .saveTask(taskData);
+    }
   }
   
-  .btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.3s;
+  // Calcular tiempo pendiente
+  function calculatePendingTime(deliveryDate) {
+    const now = new Date();
+    const delivery = new Date(deliveryDate);
+    
+    // Calcular diferencia en milisegundos
+    const diffMs = delivery - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    if (diffMs < 0) {
+      return "Vencido";
+    } else if (diffHours >= 24) {
+      const diffDays = Math.floor(diffHours / 24);
+      return `Faltan ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+    } else {
+      return `Faltan ${Math.floor(diffHours)} hora${Math.floor(diffHours) !== 1 ? 's' : ''}`;
+    }
   }
   
-  .btn-primary {
-    background-color: #3498db;
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    background-color: #2980b9;
-  }
-  
-  .btn-success {
-    background-color: #2ecc71;
-    color: white;
-  }
-  
-  .btn-success:hover {
-    background-color: #27ae60;
-  }
-  
-  .btn-secondary {
-    background-color: #95a5a6;
-    color: white;
-  }
-  
-  .btn-secondary:hover {
-    background-color: #7f8c8d;
-  }
-  
-  .btn-small {
-    padding: 5px 10px;
-    font-size: 0.8em;
-  }
-  
-  /* Modal styles */
-  .modal {
-    display: none;
-    position: fixed;
-    z-index: 1;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.4);
-  }
-  
-  .modal-content {
-    background-color: #fefefe;
-    margin: 10% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 60%;
-    max-width: 600px;
-    border-radius: 5px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  }
-  
-  .modal-sm {
-    width: 40%;
-    max-width: 400px;
-  }
-  
-  .close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  
-  .close:hover,
-  .close:focus {
-    color: black;
-    text-decoration: none;
-  }
-  
-  h2, h3 {
-    margin-bottom: 15px;
-    color: #2c3e50;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
-  input, select, textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: inherit;
-  }
-  
-  .form-actions {
-    margin-top: 20px;
-    text-align: right;
-  }
-  
-  .form-actions button {
-    margin-left: 10px;
-  }
-  
-  .description-toolbar {
-    margin-bottom: 5px;
-  }
-  
-  /* Estatus select en la tabla */
-  .estatus-select {
-    width: 100%;
-    padding: 5px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  /* Priority styles */
-  .priority-alta {
-    color: #e74c3c;
-    font-weight: bold;
-  }
-  
-  .priority-media {
-    color: #f39c12;
-  }
-  
-  .priority-baja {
-    color: #3498db;
-  }
-  
-  /* Link in description */
-  .task-link {
-    color: #3498db;
-    text-decoration: underline;
-  }
-</style>
+  // Definir la función para que sea accesible desde el HTML
+  window.openEditTaskModal = openEditTaskModal;
+</script>
